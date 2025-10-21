@@ -4,6 +4,8 @@ import '../utils/text_styles.dart';
 import '../widgets/bottom_nav_bar.dart';
 import '../widgets/emergency_contact_card.dart';
 import '../widgets/custom_text_field.dart';
+import '../services/api_service.dart';
+import 'auth_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
   final Function(int)? onNavigateBack;
@@ -20,9 +22,101 @@ class _ProfileScreenState extends State<ProfileScreen> {
   bool autoLocation = true;
   bool emergencyNotif = true;
   bool soundAlerts = false;
+  bool isLoading = true;
+
+  Map<String, dynamic>? userData;
+  List<Map<String, dynamic>> emergencyContacts = [];
+
+  final TextEditingController fullNameController = TextEditingController();
+  final TextEditingController emailController = TextEditingController();
+  final TextEditingController phoneController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _loadProfile();
+  }
+
+  @override
+  void dispose() {
+    fullNameController.dispose();
+    emailController.dispose();
+    phoneController.dispose();
+    super.dispose();
+  }
+
+  Future<void> _loadProfile() async {
+    final result = await ApiService.getProfile();
+
+    if (result['success']) {
+      setState(() {
+        userData = result['data'];
+        fullNameController.text = userData?['fullName'] ?? '';
+        emailController.text = userData?['email'] ?? '';
+        phoneController.text = userData?['phone'] ?? '';
+        emergencyContacts = List<Map<String, dynamic>>.from(
+            userData?['emergencyContacts'] ?? []);
+
+        final settings = userData?['settings'];
+        if (settings != null) {
+          sosVibration = settings['sosVibration'] ?? true;
+          autoLocation = settings['autoLocation'] ?? true;
+          emergencyNotif = settings['emergencyNotif'] ?? true;
+          soundAlerts = settings['soundAlerts'] ?? false;
+        }
+
+        isLoading = false;
+      });
+    } else {
+      setState(() {
+        isLoading = false;
+      });
+      _showError(result['message']);
+    }
+  }
+
+  void _showError(String message) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(message), backgroundColor: AppColors.primary),
+    );
+  }
+
+  Future<void> _updateSettings(String key, bool value) async {
+    setState(() {
+      if (key == 'sosVibration') sosVibration = value;
+      if (key == 'autoLocation') autoLocation = value;
+      if (key == 'emergencyNotif') emergencyNotif = value;
+      if (key == 'soundAlerts') soundAlerts = value;
+    });
+
+    await ApiService.updateProfile(
+      settings: {
+        'sosVibration': sosVibration,
+        'autoLocation': autoLocation,
+        'emergencyNotif': emergencyNotif,
+        'soundAlerts': soundAlerts,
+      },
+    );
+  }
+
+  Future<void> _logout() async {
+    await ApiService.logout();
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => const AuthScreen()),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
+    if (isLoading) {
+      return const Scaffold(
+        backgroundColor: AppColors.background,
+        body:
+            Center(child: CircularProgressIndicator(color: AppColors.primary)),
+      );
+    }
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
@@ -48,10 +142,9 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ],
         ),
         actions: [
-          Padding(
-            padding: const EdgeInsets.only(right: 16),
-            child: Text('Төтенше жағдайлар қауіпсіздігі',
-                style: AppTextStyles.caption),
+          IconButton(
+            icon: const Icon(Icons.logout, color: AppColors.primary),
+            onPressed: _logout,
           ),
         ],
       ),
@@ -69,14 +162,20 @@ class _ProfileScreenState extends State<ProfileScreen> {
               title: 'Жеке ақпарат',
               child: Column(
                 children: [
-                  const CustomTextField(
-                      label: 'Толық аты-жөні', hintText: 'John Smith'),
+                  CustomTextField(
+                      label: 'Толық аты-жөні',
+                      hintText: 'John Smith',
+                      controller: fullNameController),
                   const SizedBox(height: 16),
-                  const CustomTextField(
-                      label: 'Email', hintText: 'john.smith@email.com'),
+                  CustomTextField(
+                      label: 'Email',
+                      hintText: 'john.smith@email.com',
+                      controller: emailController),
                   const SizedBox(height: 16),
-                  const CustomTextField(
-                      label: 'Телефон нөмірі', hintText: '+1 (555) 123-4567'),
+                  CustomTextField(
+                      label: 'Телефон нөмірі',
+                      hintText: '+1 (555) 123-4567',
+                      controller: phoneController),
                 ],
               ),
             ),
@@ -88,33 +187,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    'SOS іске қосылғанда хабарландырылатын 3 сенімді контакт қосыңыз',
-                    style: AppTextStyles.caption,
-                  ),
+                      'SOS іске қосылғанда хабарландырылатын 3 сенімді контакт қосыңыз',
+                      style: AppTextStyles.caption),
                   const SizedBox(height: 16),
-                  EmergencyContactCard(
-                    name: 'John Doe',
-                    phone: '+1 (555) 123-4567',
-                    relation: 'Аға',
-                    onEdit: () {},
-                    onRemove: () {},
-                  ),
-                  const SizedBox(height: 12),
-                  EmergencyContactCard(
-                    name: 'Sarah Smith',
-                    phone: '+1 (555) 987-6543',
-                    relation: 'Дос',
-                    onEdit: () {},
-                    onRemove: () {},
-                  ),
-                  const SizedBox(height: 12),
-                  EmergencyContactCard(
-                    name: 'Ана',
-                    phone: '+1 (555) 456-7890',
-                    relation: 'Ана',
-                    onEdit: () {},
-                    onRemove: () {},
-                  ),
+                  ...emergencyContacts
+                      .map((contact) => Padding(
+                            padding: const EdgeInsets.only(bottom: 12),
+                            child: EmergencyContactCard(
+                              name: contact['name'] ?? '',
+                              phone: contact['phone'] ?? '',
+                              relation: contact['relation'] ?? '',
+                              onEdit: () {},
+                              onRemove: () {},
+                            ),
+                          ))
+                      .toList(),
                 ],
               ),
             ),
@@ -126,23 +213,23 @@ class _ProfileScreenState extends State<ProfileScreen> {
                 children: [
                   _buildSwitchTile('SOS батырмасының дірілі',
                       'SOS іске қосылғанда дірілдету', sosVibration, (val) {
-                    setState(() => sosVibration = val);
+                    _updateSettings('sosVibration', val);
                   }),
                   _buildSwitchTile(
                       'Орынды автоматты бөлісу',
                       'SOS кезінде орынды автоматты бөлісу',
                       autoLocation, (val) {
-                    setState(() => autoLocation = val);
+                    _updateSettings('autoLocation', val);
                   }),
                   _buildSwitchTile(
                       'Төтенше хабарландырулар',
                       'Жақын маңдағы төтенше жағдайлар туралы хабарландыру',
                       emergencyNotif, (val) {
-                    setState(() => emergencyNotif = val);
+                    _updateSettings('emergencyNotif', val);
                   }),
                   _buildSwitchTile('Дыбыстық хабарландырулар',
                       'SOS іске қосылғанда дыбыс шығару', soundAlerts, (val) {
-                    setState(() => soundAlerts = val);
+                    _updateSettings('soundAlerts', val);
                   }),
                 ],
               ),

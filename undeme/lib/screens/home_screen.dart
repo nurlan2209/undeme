@@ -3,6 +3,8 @@ import '../utils/colors.dart';
 import '../utils/text_styles.dart';
 import '../widgets/bottom_nav_bar.dart';
 import 'profile_screen.dart';
+import 'legal_screen.dart';
+import 'services_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({Key? key}) : super(key: key);
@@ -16,6 +18,26 @@ class _HomeScreenState extends State<HomeScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_currentIndex == 1) {
+      return ServicesScreen(
+        onNavigateBack: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+      );
+    }
+
+    if (_currentIndex == 3) {
+      return LegalScreen(
+        onNavigateBack: (index) {
+          setState(() {
+            _currentIndex = index;
+          });
+        },
+      );
+    }
+
     if (_currentIndex == 4) {
       return ProfileScreen(
         onNavigateBack: (index) {
