@@ -20,6 +20,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
 
   final List<_ChatMessage> _messages = <_ChatMessage>[];
   bool _sending = false;
+  bool _historyLoading = false;
   int _currentIndex = 2;
 
   @override
@@ -32,6 +33,7 @@ class _AiChatScreenState extends State<AiChatScreen> {
             'Бұл чат тек бағыт-бағдар береді. Қауіп төнсе, дереу 112 нөміріне хабарласыңыз.',
       ),
     );
+    _loadHistory();
   }
 
   @override
@@ -83,6 +85,37 @@ class _AiChatScreenState extends State<AiChatScreen> {
     }
   }
 
+  Future<void> _loadHistory() async {
+    setState(() {
+      _historyLoading = true;
+    });
+
+    try {
+      final items = await _repository.history();
+      final chronological = items.reversed.toList();
+
+      for (final item in chronological) {
+        final message = item['message']?.toString().trim() ?? '';
+        final response = item['response']?.toString().trim() ?? '';
+
+        if (message.isNotEmpty) {
+          _messages.add(_ChatMessage(role: _Role.user, text: message));
+        }
+        if (response.isNotEmpty) {
+          _messages.add(_ChatMessage(role: _Role.assistant, text: response));
+        }
+      }
+    } catch (_) {
+      // History is optional for rendering; keep chat available.
+    } finally {
+      if (mounted) {
+        setState(() {
+          _historyLoading = false;
+        });
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -110,38 +143,45 @@ class _AiChatScreenState extends State<AiChatScreen> {
           _QuickPrompts(
               onTap: (value, context) => _send(value, context: context)),
           Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              itemCount: _messages.length,
-              itemBuilder: (context, index) {
-                final item = _messages[index];
-                final isUser = item.role == _Role.user;
+            child: _historyLoading
+                ? const Center(child: CircularProgressIndicator())
+                : ListView.builder(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    itemCount: _messages.length,
+                    itemBuilder: (context, index) {
+                      final item = _messages[index];
+                      final isUser = item.role == _Role.user;
 
-                return Align(
-                  alignment:
-                      isUser ? Alignment.centerRight : Alignment.centerLeft,
-                  child: Container(
-                    margin: const EdgeInsets.symmetric(vertical: 6),
-                    padding: const EdgeInsets.all(12),
-                    constraints: BoxConstraints(
-                        maxWidth: MediaQuery.of(context).size.width * 0.8),
-                    decoration: BoxDecoration(
-                      color: isUser ? AppColors.primary : Colors.white,
-                      borderRadius: BorderRadius.circular(12),
-                      border:
-                          isUser ? null : Border.all(color: AppColors.border),
-                    ),
-                    child: Text(
-                      item.text,
-                      style: TextStyle(
-                        color: isUser ? Colors.white : AppColors.textPrimary,
-                        fontSize: 14,
-                      ),
-                    ),
+                      return Align(
+                        alignment: isUser
+                            ? Alignment.centerRight
+                            : Alignment.centerLeft,
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(vertical: 6),
+                          padding: const EdgeInsets.all(12),
+                          constraints: BoxConstraints(
+                              maxWidth:
+                                  MediaQuery.of(context).size.width * 0.8),
+                          decoration: BoxDecoration(
+                            color: isUser ? AppColors.primary : Colors.white,
+                            borderRadius: BorderRadius.circular(12),
+                            border: isUser
+                                ? null
+                                : Border.all(color: AppColors.border),
+                          ),
+                          child: Text(
+                            item.text,
+                            style: TextStyle(
+                              color:
+                                  isUser ? Colors.white : AppColors.textPrimary,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
                   ),
-                );
-              },
-            ),
           ),
           SafeArea(
             top: false,

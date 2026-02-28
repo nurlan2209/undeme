@@ -6,6 +6,8 @@ const env = require("./config/env");
 const authRoutes = require("./routes/auth");
 const sosRoutes = require("./routes/sos");
 const aiRoutes = require("./routes/ai");
+const legalRoutes = require("./routes/legal");
+const servicesRoutes = require("./routes/services");
 const { globalLimiter } = require("./middleware/rateLimits");
 const errorHandler = require("./middleware/errorHandler");
 
@@ -56,6 +58,8 @@ app.get("/", (req, res) => {
 app.use("/api/auth", authRoutes);
 app.use("/api/sos", sosRoutes);
 app.use("/api/ai", aiRoutes);
+app.use("/api/legal", legalRoutes);
+app.use("/api/services", servicesRoutes);
 
 app.use(errorHandler);
 
