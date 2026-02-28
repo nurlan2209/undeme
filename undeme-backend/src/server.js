@@ -1,69 +1,64 @@
 const express = require("express");
-const dotenv = require("dotenv");
 const cors = require("cors");
+const helmet = require("helmet");
 const connectDB = require("./config/db");
+const env = require("./config/env");
 const authRoutes = require("./routes/auth");
-
-// Загрузка переменных окружения
-dotenv.config();
+const sosRoutes = require("./routes/sos");
+const aiRoutes = require("./routes/ai");
+const { globalLimiter } = require("./middleware/rateLimits");
+const errorHandler = require("./middleware/errorHandler");
 
 const app = express();
 
-// Подключение к MongoDB
 connectDB();
 
-// КРИТИЧЕСКИ ВАЖНО: CORS должен быть ПЕРВЫМ middleware
-// Настройка CORS для разрешения запросов от Flutter Web
 const corsOptions = {
-  origin: function (origin, callback) {
-    // Разрешить запросы без origin (например, мобильные приложения)
-    // или с любым origin в режиме разработки
-    callback(null, true);
+  origin(origin, callback) {
+    if (!origin) {
+      return callback(null, true);
+    }
+
+    if (env.nodeEnv !== "production") {
+      return callback(null, true);
+    }
+
+    if (env.corsOrigins.includes(origin)) {
+      return callback(null, true);
+    }
+
+    return callback(new Error("Not allowed by CORS"));
   },
-  credentials: true,
+  credentials: false,
   methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-    "X-Requested-With",
-    "Accept",
-  ],
-  exposedHeaders: ["Content-Length", "X-JSON"],
-  maxAge: 86400, // 24 часа
+  allowedHeaders: ["Content-Type", "Authorization"],
+  maxAge: 86400,
 };
 
+app.use(helmet());
 app.use(cors(corsOptions));
+app.use(globalLimiter);
+app.use(express.json({ limit: "1mb" }));
 
-// Парсинг JSON
-app.use(express.json());
-
-// Логирование запросов (для отладки)
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.path}`);
+  console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
   next();
 });
 
-// Маршруты
-app.use("/api/auth", authRoutes);
-
-// Базовый маршрут
 app.get("/", (req, res) => {
   res.json({
-    message: "Undeme API работает",
-    cors: "enabled",
-    port: process.env.PORT || 5002,
+    service: "Undeme API",
+    status: "ok",
+    env: env.nodeEnv,
   });
 });
 
-// Обработка ошибок
-app.use((err, req, res, next) => {
-  console.error(err.stack);
-  res.status(500).json({ message: "Сервер қатесі", error: err.message });
-});
+app.use("/api/auth", authRoutes);
+app.use("/api/sos", sosRoutes);
+app.use("/api/ai", aiRoutes);
 
-const PORT = process.env.PORT || 5002;
+app.use(errorHandler);
 
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
-  console.log(`CORS enabled for all origins`);
+app.listen(env.port, () => {
+  console.log(`Server running on port ${env.port}`);
 });

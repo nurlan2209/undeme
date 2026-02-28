@@ -1,18 +1,21 @@
 const jwt = require("jsonwebtoken");
+const env = require("../config/env");
 
-const auth = async (req, res, next) => {
+const auth = (req, res, next) => {
   try {
-    const token = req.header("Authorization")?.replace("Bearer ", "");
+    const authHeader = req.header("Authorization");
 
-    if (!token) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ message: "Аутентификация қажет" });
     }
 
-    const decoded = jwt.verify(token, process.env.JWT_SECRET);
+    const token = authHeader.slice(7).trim();
+    const decoded = jwt.verify(token, env.jwtSecret);
+
     req.userId = decoded.userId;
     next();
   } catch (error) {
-    res.status(401).json({ message: "Жарамсыз токен" });
+    return res.status(401).json({ message: "Жарамсыз токен" });
   }
 };
 

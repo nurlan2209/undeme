@@ -1,31 +1,35 @@
 import 'package:flutter/material.dart';
+
+import '../features/auth/data/auth_repository.dart';
+import '../features/profile/data/profile_repository.dart';
+import '../features/profile/domain/emergency_contact.dart';
+import '../features/profile/domain/user_profile.dart';
 import '../utils/colors.dart';
 import '../utils/text_styles.dart';
 import '../widgets/bottom_nav_bar.dart';
-import '../widgets/emergency_contact_card.dart';
 import '../widgets/custom_text_field.dart';
-import '../services/api_service.dart';
+import '../widgets/emergency_contact_card.dart';
 import 'auth_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
-  final Function(int)? onNavigateBack;
+  const ProfileScreen({super.key, this.onNavigateBack});
 
-  const ProfileScreen({Key? key, this.onNavigateBack}) : super(key: key);
+  final Function(int)? onNavigateBack;
 
   @override
   State<ProfileScreen> createState() => _ProfileScreenState();
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  int _currentIndex = 4;
-  bool sosVibration = true;
-  bool autoLocation = true;
-  bool emergencyNotif = true;
-  bool soundAlerts = false;
-  bool isLoading = true;
+  final ProfileRepository _profileRepository = ProfileRepository();
+  final AuthRepository _authRepository = AuthRepository();
 
-  Map<String, dynamic>? userData;
-  List<Map<String, dynamic>> emergencyContacts = [];
+  int _currentIndex = 4;
+  bool isLoading = true;
+  bool isSavingProfile = false;
+
+  UserProfile? userProfile;
+  List<EmergencyContact> emergencyContacts = <EmergencyContact>[];
 
   final TextEditingController fullNameController = TextEditingController();
   final TextEditingController emailController = TextEditingController();
@@ -46,32 +50,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Future<void> _loadProfile() async {
-    final result = await ApiService.getProfile();
+    setState(() {
+      isLoading = true;
+    });
 
-    if (result['success']) {
+    try {
+      final profile = await _profileRepository.getProfile();
+
       setState(() {
-        userData = result['data'];
-        fullNameController.text = userData?['fullName'] ?? '';
-        emailController.text = userData?['email'] ?? '';
-        phoneController.text = userData?['phone'] ?? '';
-        emergencyContacts = List<Map<String, dynamic>>.from(
-            userData?['emergencyContacts'] ?? []);
-
-        final settings = userData?['settings'];
-        if (settings != null) {
-          sosVibration = settings['sosVibration'] ?? true;
-          autoLocation = settings['autoLocation'] ?? true;
-          emergencyNotif = settings['emergencyNotif'] ?? true;
-          soundAlerts = settings['soundAlerts'] ?? false;
-        }
-
-        isLoading = false;
+        userProfile = profile;
+        emergencyContacts = profile.emergencyContacts;
+        fullNameController.text = profile.fullName;
+        emailController.text = profile.email;
+        phoneController.text = profile.phone;
       });
-    } else {
-      setState(() {
-        isLoading = false;
-      });
-      _showError(result['message']);
+    } catch (error) {
+      _showError(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          isLoading = false;
+        });
+      }
     }
   }
 
@@ -81,29 +81,274 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Future<void> _updateSettings(String key, bool value) async {
+  Future<void> _saveProfile() async {
+    final fullName = fullNameController.text.trim();
+    final phone = phoneController.text.trim();
+
+    if (fullName.length < 2) {
+      _showError('Аты-жөні кемінде 2 символ болуы керек');
+      return;
+    }
+
+    if (phone.length < 7) {
+      _showError('Телефон нөмірін дұрыс енгізіңіз');
+      return;
+    }
+
     setState(() {
-      if (key == 'sosVibration') sosVibration = value;
-      if (key == 'autoLocation') autoLocation = value;
-      if (key == 'emergencyNotif') emergencyNotif = value;
-      if (key == 'soundAlerts') soundAlerts = value;
+      isSavingProfile = true;
     });
 
-    await ApiService.updateProfile(
-      settings: {
-        'sosVibration': sosVibration,
-        'autoLocation': autoLocation,
-        'emergencyNotif': emergencyNotif,
-        'soundAlerts': soundAlerts,
+    try {
+      final updated = await _profileRepository.updateProfile(
+          fullName: fullName, phone: phone);
+      setState(() {
+        userProfile = updated;
+      });
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Профиль сақталды')),
+        );
+      }
+    } catch (error) {
+      _showError(error.toString().replaceFirst('Exception: ', ''));
+    } finally {
+      if (mounted) {
+        setState(() {
+          isSavingProfile = false;
+        });
+      }
+    }
+  }
+
+  Future<void> _updateSetting(String key, bool value) async {
+    final previous =
+        Map<String, dynamic>.from(userProfile?.settings ?? <String, dynamic>{});
+    final next = Map<String, dynamic>.from(previous)..[key] = value;
+
+    setState(() {
+      userProfile = UserProfile(
+        id: userProfile?.id ?? '',
+        fullName: userProfile?.fullName ?? fullNameController.text.trim(),
+        email: userProfile?.email ?? emailController.text.trim(),
+        phone: userProfile?.phone ?? phoneController.text.trim(),
+        emergencyContacts: emergencyContacts,
+        settings: next,
+      );
+    });
+
+    try {
+      final updated = await _profileRepository.updateProfile(settings: next);
+      setState(() {
+        userProfile = updated;
+      });
+    } catch (error) {
+      setState(() {
+        userProfile = UserProfile(
+          id: userProfile?.id ?? '',
+          fullName: userProfile?.fullName ?? fullNameController.text.trim(),
+          email: userProfile?.email ?? emailController.text.trim(),
+          phone: userProfile?.phone ?? phoneController.text.trim(),
+          emergencyContacts: emergencyContacts,
+          settings: previous,
+        );
+      });
+      _showError(error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _addOrEditContact({EmergencyContact? source}) async {
+    final nameController = TextEditingController(text: source?.name ?? '');
+    final phoneController = TextEditingController(text: source?.phone ?? '');
+    final relationController =
+        TextEditingController(text: source?.relation ?? '');
+
+    final result = await showDialog<EmergencyContact>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text(source == null ? 'Контакт қосу' : 'Контакт өзгерту'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: nameController,
+                  decoration: const InputDecoration(labelText: 'Аты-жөні'),
+                ),
+                TextField(
+                  controller: phoneController,
+                  decoration: const InputDecoration(labelText: 'Телефон'),
+                  keyboardType: TextInputType.phone,
+                ),
+                TextField(
+                  controller: relationController,
+                  decoration: const InputDecoration(labelText: 'Қатынасы'),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Бас тарту'),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                final name = nameController.text.trim();
+                final phone = phoneController.text.trim();
+                final relation = relationController.text.trim();
+
+                if (name.length < 2 ||
+                    phone.length < 7 ||
+                    relation.length < 2) {
+                  _showError('Контакт мәліметтерін толық енгізіңіз');
+                  return;
+                }
+
+                Navigator.pop(
+                  context,
+                  EmergencyContact(
+                    id: source?.id ?? '',
+                    name: name,
+                    phone: phone,
+                    relation: relation,
+                  ),
+                );
+              },
+              child: const Text('Сақтау'),
+            ),
+          ],
+        );
       },
     );
+
+    nameController.dispose();
+    phoneController.dispose();
+    relationController.dispose();
+
+    if (result == null) {
+      return;
+    }
+
+    try {
+      if (source == null) {
+        final contacts = await _profileRepository.addContact(result);
+        setState(() {
+          emergencyContacts = contacts;
+        });
+      } else {
+        final contacts = await _profileRepository
+            .updateContact(result.copyWith(id: source.id));
+        setState(() {
+          emergencyContacts = contacts;
+        });
+      }
+    } catch (error) {
+      _showError(error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _removeContact(EmergencyContact contact) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Контактты жою'),
+          content: Text('${contact.name} контактын жоюға сенімдісіз бе?'),
+          actions: [
+            TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('Жоқ')),
+            ElevatedButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('Жою')),
+          ],
+        );
+      },
+    );
+
+    if (confirmed != true) {
+      return;
+    }
+
+    try {
+      final contacts = await _profileRepository.deleteContact(contact.id);
+      setState(() {
+        emergencyContacts = contacts;
+      });
+    } catch (error) {
+      _showError(error.toString().replaceFirst('Exception: ', ''));
+    }
+  }
+
+  Future<void> _deleteAccount() async {
+    final passwordController = TextEditingController();
+
+    final confirmedPassword = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Аккаунтты жою'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                  'Бұл әрекет қайтарылмайды. Растау үшін құпия сөзді енгізіңіз.'),
+              const SizedBox(height: 12),
+              TextField(
+                controller: passwordController,
+                obscureText: true,
+                decoration: const InputDecoration(labelText: 'Құпия сөз'),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Бас тарту'),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () => Navigator.pop(context, passwordController.text),
+              child: const Text('Жою'),
+            ),
+          ],
+        );
+      },
+    );
+
+    passwordController.dispose();
+
+    if (confirmedPassword == null || confirmedPassword.isEmpty) {
+      return;
+    }
+
+    try {
+      await _profileRepository.deleteAccount(confirmedPassword);
+      await _authRepository.logout();
+      if (!mounted) {
+        return;
+      }
+      Navigator.pushAndRemoveUntil(
+        context,
+        MaterialPageRoute(builder: (_) => const AuthScreen()),
+        (route) => false,
+      );
+    } catch (error) {
+      _showError(error.toString().replaceFirst('Exception: ', ''));
+    }
   }
 
   Future<void> _logout() async {
-    await ApiService.logout();
-    Navigator.pushReplacement(
+    await _authRepository.logout();
+    if (!mounted) {
+      return;
+    }
+    Navigator.pushAndRemoveUntil(
       context,
-      MaterialPageRoute(builder: (context) => const AuthScreen()),
+      MaterialPageRoute(builder: (_) => const AuthScreen()),
+      (route) => false,
     );
   }
 
@@ -117,30 +362,14 @@ class _ProfileScreenState extends State<ProfileScreen> {
       );
     }
 
+    final settings = userProfile?.settings ?? <String, dynamic>{};
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: Colors.white,
         elevation: 0,
-        title: Row(
-          children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child:
-                  const Icon(Icons.shield, color: AppColors.primary, size: 24),
-            ),
-            const SizedBox(width: 12),
-            const Text('Undeme',
-                style: TextStyle(
-                    color: Colors.black,
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold)),
-          ],
-        ),
+        title: const Text('Профиль және баптаулар'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout, color: AppColors.primary),
@@ -148,113 +377,158 @@ class _ProfileScreenState extends State<ProfileScreen> {
           ),
         ],
       ),
-      body: SingleChildScrollView(
-        child: Column(
+      body: RefreshIndicator(
+        onRefresh: _loadProfile,
+        child: ListView(
+          padding: const EdgeInsets.only(bottom: 24),
           children: [
-            const SizedBox(height: 24),
-            Text('Профиль және баптаулар', style: AppTextStyles.title),
-            const SizedBox(height: 8),
-            Text('Ақпаратыңызды және төтенше байланыс контактілерін басқарыңыз',
-                style: AppTextStyles.subtitle),
-            const SizedBox(height: 32),
             _buildSection(
               icon: Icons.person,
               title: 'Жеке ақпарат',
               child: Column(
                 children: [
                   CustomTextField(
-                      label: 'Толық аты-жөні',
-                      hintText: 'John Smith',
-                      controller: fullNameController),
+                    label: 'Толық аты-жөні',
+                    hintText: 'John Smith',
+                    controller: fullNameController,
+                  ),
                   const SizedBox(height: 16),
                   CustomTextField(
-                      label: 'Email',
-                      hintText: 'john.smith@email.com',
-                      controller: emailController),
+                    label: 'Email',
+                    hintText: 'john.smith@email.com',
+                    controller: emailController,
+                    readOnly: true,
+                  ),
                   const SizedBox(height: 16),
                   CustomTextField(
-                      label: 'Телефон нөмірі',
-                      hintText: '+1 (555) 123-4567',
-                      controller: phoneController),
+                    label: 'Телефон нөмірі',
+                    hintText: '+1 (555) 123-4567',
+                    controller: phoneController,
+                    keyboardType: TextInputType.phone,
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    child: ElevatedButton(
+                      onPressed: isSavingProfile ? null : _saveProfile,
+                      style: ElevatedButton.styleFrom(
+                          backgroundColor: AppColors.primary),
+                      child: isSavingProfile
+                          ? const SizedBox(
+                              height: 18,
+                              width: 18,
+                              child: CircularProgressIndicator(
+                                  strokeWidth: 2, color: Colors.white),
+                            )
+                          : const Text('Профильді сақтау'),
+                    ),
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             _buildSection(
               icon: Icons.shield,
-              title: 'Төтенше байланыс контактілері',
+              title: 'Төтенше контактілер',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                      'SOS іске қосылғанда хабарландырылатын 3 сенімді контакт қосыңыз',
-                      style: AppTextStyles.caption),
-                  const SizedBox(height: 16),
-                  ...emergencyContacts
-                      .map((contact) => Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: EmergencyContactCard(
-                              name: contact['name'] ?? '',
-                              phone: contact['phone'] ?? '',
-                              relation: contact['relation'] ?? '',
-                              onEdit: () {},
-                              onRemove: () {},
-                            ),
-                          ))
-                      .toList(),
+                    'SOS кезінде хабарланатын контактілер',
+                    style: AppTextStyles.caption,
+                  ),
+                  const SizedBox(height: 12),
+                  if (emergencyContacts.isEmpty)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: AppColors.border),
+                        borderRadius: BorderRadius.circular(12),
+                        color: Colors.white,
+                      ),
+                      child: Text(
+                          'Контакттар жоқ. Ең кемі 1 сенімді контакт қосыңыз.',
+                          style: AppTextStyles.caption),
+                    )
+                  else
+                    ...emergencyContacts.map(
+                      (contact) => Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: EmergencyContactCard(
+                          name: contact.name,
+                          phone: contact.phone,
+                          relation: contact.relation,
+                          onEdit: () => _addOrEditContact(source: contact),
+                          onRemove: () => _removeContact(contact),
+                        ),
+                      ),
+                    ),
+                  const SizedBox(height: 8),
+                  OutlinedButton.icon(
+                    onPressed: emergencyContacts.length >= 5
+                        ? null
+                        : () => _addOrEditContact(),
+                    icon: const Icon(Icons.add),
+                    label: const Text('Контакт қосу'),
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             _buildSection(
               icon: Icons.settings,
-              title: 'Қосымша баптаулары',
+              title: 'SOS баптаулары',
               child: Column(
                 children: [
-                  _buildSwitchTile('SOS батырмасының дірілі',
-                      'SOS іске қосылғанда дірілдету', sosVibration, (val) {
-                    _updateSettings('sosVibration', val);
-                  }),
                   _buildSwitchTile(
-                      'Орынды автоматты бөлісу',
-                      'SOS кезінде орынды автоматты бөлісу',
-                      autoLocation, (val) {
-                    _updateSettings('autoLocation', val);
-                  }),
+                    'SOS батырмасының дірілі',
+                    'Іске қосылғанда қысқа вибрация',
+                    settings['sosVibration'] == true,
+                    (value) => _updateSetting('sosVibration', value),
+                  ),
                   _buildSwitchTile(
-                      'Төтенше хабарландырулар',
-                      'Жақын маңдағы төтенше жағдайлар туралы хабарландыру',
-                      emergencyNotif, (val) {
-                    _updateSettings('emergencyNotif', val);
-                  }),
-                  _buildSwitchTile('Дыбыстық хабарландырулар',
-                      'SOS іске қосылғанда дыбыс шығару', soundAlerts, (val) {
-                    _updateSettings('soundAlerts', val);
-                  }),
+                    'Орынды автоматты бөлісу',
+                    'SOS кезінде геолокация жіберу',
+                    settings['autoLocation'] != false,
+                    (value) => _updateSetting('autoLocation', value),
+                  ),
+                  _buildSwitchTile(
+                    'Төтенше хабарландырулар',
+                    'Маңызды қауіп ескертпелерін алу',
+                    settings['emergencyNotif'] != false,
+                    (value) => _updateSetting('emergencyNotif', value),
+                  ),
+                  _buildSwitchTile(
+                    'Дыбыстық сигнал',
+                    'SOS іске қосылғанда дыбыс',
+                    settings['soundAlerts'] == true,
+                    (value) => _updateSetting('soundAlerts', value),
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             _buildSection(
-              icon: Icons.lock,
-              title: 'Құпиялық және қауіпсіздік',
+              icon: Icons.warning_amber_rounded,
+              title: 'Қауіпсіздік',
               child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  _buildPrivacyItem('🔒',
-                      'Сіздің орныңыз тек SOS іске қосылғанда ғана бөлісіледі'),
+                  Text(
+                      'Аккаунтты жойғаннан кейін деректерді қалпына келтіру мүмкін емес.',
+                      style: AppTextStyles.caption),
                   const SizedBox(height: 12),
-                  _buildPrivacyItem('📱',
-                      'Төтенше байланыс контактілері құрылғыңызда қауіпсіз сақталады'),
-                  const SizedBox(height: 12),
-                  _buildPrivacyItem('🚫',
-                      'Біз сіздің жеке ақпаратыңызды үшінші тараптармен бөліспейміз'),
-                  const SizedBox(height: 12),
-                  _buildPrivacyItem(
-                      '🗑️', 'Деректеріңізді кез келген уақытта жоя аласыз'),
+                  ElevatedButton.icon(
+                    onPressed: _deleteAccount,
+                    style:
+                        ElevatedButton.styleFrom(backgroundColor: Colors.red),
+                    icon: const Icon(Icons.delete_forever),
+                    label: const Text('Аккаунтты жою'),
+                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 24),
           ],
         ),
       ),
@@ -299,7 +573,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   }
 
   Widget _buildSwitchTile(
-      String title, String subtitle, bool value, Function(bool) onChanged) {
+      String title, String subtitle, bool value, ValueChanged<bool> onChanged) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 16),
       child: Row(
@@ -320,20 +594,10 @@ class _ProfileScreenState extends State<ProfileScreen> {
           Switch(
             value: value,
             onChanged: onChanged,
-            activeColor: AppColors.primary,
+            activeThumbColor: AppColors.primary,
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildPrivacyItem(String emoji, String text) {
-    return Row(
-      children: [
-        Text(emoji, style: const TextStyle(fontSize: 20)),
-        const SizedBox(width: 12),
-        Expanded(child: Text(text, style: AppTextStyles.body)),
-      ],
     );
   }
 }
