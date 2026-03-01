@@ -15,6 +15,9 @@ const app = express();
 
 connectDB();
 
+// Trust first reverse proxy (nginx) so rate limiting uses real client IP.
+app.set("trust proxy", 1);
+
 const corsOptions = {
   origin(origin, callback) {
     if (!origin) {
