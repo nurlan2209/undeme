@@ -1,7 +1,7 @@
 class AppConfig {
   static const String apiBaseUrl = String.fromEnvironment(
     'API_BASE_URL',
-    defaultValue: 'http://93.170.72.89/api',
+    defaultValue: 'http://93.170.72.89:8080/api',
   );
 
   static const int sosCountdownSeconds = 4;
