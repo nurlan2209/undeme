@@ -1,5 +1,10 @@
-import 'package:flutter/material.dart';
+import 'dart:async';
 
+import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
+
+import '../features/ai/presentation/ai_chat_screen.dart';
+import '../features/profile/data/profile_repository.dart';
 import '../features/sos/presentation/sos_controller.dart';
 import '../utils/colors.dart';
 import '../utils/text_styles.dart';
@@ -7,7 +12,6 @@ import '../widgets/bottom_nav_bar.dart';
 import 'legal_screen.dart';
 import 'profile_screen.dart';
 import 'services_screen.dart';
-import '../features/ai/presentation/ai_chat_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -18,18 +22,127 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+  int _lastHandledSosCount = 0;
   final SosController _sosController = SosController();
+  final ProfileRepository _profileRepository = ProfileRepository();
 
   @override
   void initState() {
     super.initState();
+    _sosController.addListener(_onSosStateChanged);
     _sosController.init();
   }
 
   @override
   void dispose() {
+    _sosController.removeListener(_onSosStateChanged);
     _sosController.dispose();
     super.dispose();
+  }
+
+  void _onSosStateChanged() {
+    unawaited(_handleSosSideEffects());
+  }
+
+  Future<void> _handleSosSideEffects() async {
+    if (!mounted) {
+      return;
+    }
+
+    final shouldOpenWhatsApp = _sosController.phase == SosPhase.success ||
+        _sosController.phase == SosPhase.queuedOffline;
+
+    if (!shouldOpenWhatsApp) {
+      return;
+    }
+
+    if (_sosController.completedSosCount <= _lastHandledSosCount) {
+      return;
+    }
+
+    _lastHandledSosCount = _sosController.completedSosCount;
+    await _openWhatsAppManualShare();
+  }
+
+  Future<void> _openWhatsAppManualShare() async {
+    final message = _sosController.lastSosMessage.trim();
+    if (message.isEmpty) {
+      return;
+    }
+
+    final encoded = Uri.encodeComponent(message);
+    String? targetPhone;
+    String targetName = '';
+
+    try {
+      final profile = await _profileRepository.getProfile();
+      for (final contact in profile.emergencyContacts) {
+        final normalized = _normalizeWhatsAppPhone(contact.phone);
+        if (normalized.isNotEmpty) {
+          targetPhone = normalized;
+          targetName = contact.name.trim();
+          break;
+        }
+      }
+    } catch (_) {
+      // Fallback to generic chat if profile isn't available.
+    }
+
+    final appUri = targetPhone == null
+        ? Uri.parse('whatsapp://send?text=$encoded')
+        : Uri.parse('whatsapp://send?phone=$targetPhone&text=$encoded');
+    final webUri = targetPhone == null
+        ? Uri.parse('https://wa.me/?text=$encoded')
+        : Uri.parse('https://wa.me/$targetPhone?text=$encoded');
+
+    if (await canLaunchUrl(appUri)) {
+      await launchUrl(appUri, mode: LaunchMode.externalApplication);
+      if (targetPhone == null) {
+        _showSnack('WhatsApp ашылды. Хабарламаны өзіңіз жіберіңіз');
+      } else {
+        _showSnack(
+            'WhatsApp ашылды: ${targetName.isEmpty ? targetPhone : targetName}. Хабарламаны жіберіңіз');
+      }
+      return;
+    }
+
+    if (await canLaunchUrl(webUri)) {
+      await launchUrl(webUri, mode: LaunchMode.externalApplication);
+      if (targetPhone == null) {
+        _showSnack('WhatsApp Web ашылды. Хабарламаны өзіңіз жіберіңіз');
+      } else {
+        _showSnack(
+            'WhatsApp Web ашылды: ${targetName.isEmpty ? targetPhone : targetName}. Хабарламаны жіберіңіз');
+      }
+      return;
+    }
+
+    _showSnack('WhatsApp ашылмады');
+  }
+
+  String _normalizeWhatsAppPhone(String phone) {
+    var digits = phone.replaceAll(RegExp(r'[^0-9]'), '');
+    if (digits.isEmpty) {
+      return '';
+    }
+
+    if (digits.startsWith('00')) {
+      digits = digits.substring(2);
+    }
+
+    if (digits.length == 11 && digits.startsWith('8')) {
+      digits = '7${digits.substring(1)}';
+    }
+
+    return digits;
+  }
+
+  void _showSnack(String message) {
+    if (!mounted) {
+      return;
+    }
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(message)));
   }
 
   @override
@@ -234,7 +347,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       const SizedBox(width: 12),
                       Expanded(
                         child: Text(
-                          'Flow: long-press → 4 сек countdown → GPS → контактілерге жіберу. Интернет болмаса, кезекке түседі.',
+                          'Flow: long-press → 4 сек countdown → GPS → WhatsApp ашылады → user sends.',
                           style: AppTextStyles.caption,
                         ),
                       ),

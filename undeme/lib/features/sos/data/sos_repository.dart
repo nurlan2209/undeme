@@ -29,6 +29,7 @@ class SosRepository {
     return SosDispatchResult(
       eventId: event['id']?.toString() ?? '',
       status: event['status']?.toString() ?? 'failed',
+      attempts: _parseAttempts(event['attempts']),
     );
   }
 
@@ -43,6 +44,15 @@ class SosRepository {
     return SosDispatchResult(
       eventId: event['id']?.toString() ?? eventId,
       status: event['status']?.toString() ?? 'failed',
+      attempts: _parseAttempts(event['attempts']),
     );
+  }
+
+  List<SosChannelAttempt> _parseAttempts(dynamic attemptsRaw) {
+    final attemptsList = attemptsRaw as List<dynamic>? ?? <dynamic>[];
+    return attemptsList
+        .whereType<Map>()
+        .map((item) => SosChannelAttempt.fromJson(Map<String, dynamic>.from(item)))
+        .toList();
   }
 }

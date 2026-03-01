@@ -35,6 +35,10 @@ class SosController extends ChangeNotifier {
   SosPhase phase = SosPhase.idle;
   int countdown = AppConfig.sosCountdownSeconds;
   int pendingQueueCount = 0;
+  int completedSosCount = 0;
+  SosLocation? lastLocation;
+  String lastReason = '';
+  String lastSosMessage = '';
   String statusMessage = 'Ұзақ басып тұрыңыз';
 
   Timer? _timer;
@@ -101,6 +105,9 @@ class SosController extends ChangeNotifier {
 
     try {
       final location = await _resolveLocation();
+      lastLocation = location;
+      lastReason = reason;
+      lastSosMessage = _buildManualShareMessage(location: location, reason: reason);
       final isOnline = await _isOnline();
 
       if (!isOnline) {
@@ -109,35 +116,31 @@ class SosController extends ChangeNotifier {
       }
 
       Object? lastError;
+      var backendReachable = false;
       for (int attempt = 1; attempt <= AppConfig.sosSendRetries; attempt++) {
         try {
-          final result = await _repository.triggerSos(
+          await _repository.triggerSos(
               location: location, reason: reason, force: attempt > 1);
-          if (result.delivered) {
-            await _vibrate(250);
-            phase = SosPhase.success;
-            statusMessage = 'SOS контактілерге жіберілді';
-            _notify();
-            return;
-          }
-          lastError = Exception('Жеткізу ішінара/сәтсіз аяқталды');
+          backendReachable = true;
+          break;
         } catch (error) {
           lastError = error;
         }
       }
 
-      final latestOnline = await _isOnline();
-      if (!latestOnline) {
-        await _queueOffline(location: location, reason: reason);
-        return;
+      await _vibrate(250);
+      phase = SosPhase.success;
+      if (backendReachable) {
+        statusMessage = 'SOS дайын. WhatsApp арқылы қолмен жіберіңіз';
+      } else {
+        statusMessage =
+            'SOS дайын. WhatsApp арқылы қолмен жіберіңіз (backend уақытша қолжетімсіз)';
+        if (kDebugMode && lastError != null) {
+          debugPrint('SOS backend sync failed: $lastError');
+        }
       }
-
-      phase = SosPhase.error;
-      statusMessage = 'SOS жіберілмеді. Қайта көріңіз';
+      completedSosCount += 1;
       _notify();
-      if (kDebugMode && lastError != null) {
-        debugPrint('SOS send failed: $lastError');
-      }
     } catch (error) {
       phase = SosPhase.error;
       statusMessage = error.toString().replaceFirst('Exception: ', '');
@@ -162,15 +165,11 @@ class SosController extends ChangeNotifier {
 
     for (final item in items) {
       try {
-        final result = await _repository.triggerSos(
+        await _repository.triggerSos(
           location: item.location,
           reason: item.reason,
           force: true,
         );
-
-        if (!result.delivered && item.attempt < AppConfig.sosSendRetries) {
-          remaining.add(item.copyWith(attempt: item.attempt + 1));
-        }
       } catch (_) {
         if (item.attempt < AppConfig.sosSendRetries) {
           remaining.add(item.copyWith(attempt: item.attempt + 1));
@@ -196,10 +195,29 @@ class SosController extends ChangeNotifier {
       ),
     );
     pendingQueueCount += 1;
+    lastLocation = location;
+    lastReason = reason;
+    lastSosMessage = _buildManualShareMessage(location: location, reason: reason);
 
     phase = SosPhase.queuedOffline;
     statusMessage = 'Интернет жоқ. SOS кезекке қойылды';
+    completedSosCount += 1;
     _notify();
+  }
+
+  String _buildManualShareMessage({
+    required SosLocation location,
+    required String reason,
+  }) {
+    final mapsUrl = 'https://maps.google.com/?q=${location.latitude},${location.longitude}';
+
+    return [
+      '🚨 UNDEME SOS',
+      if (reason.trim().isNotEmpty) 'Себеп: ${reason.trim()}',
+      'Орналасуы: $mapsUrl',
+      'Уақыты: ${DateTime.now().toIso8601String()}',
+      'Егер тікелей қауіп болса, 112 нөміріне дереу хабарласыңыз.',
+    ].join('\n');
   }
 
   Future<SosLocation> _resolveLocation() async {

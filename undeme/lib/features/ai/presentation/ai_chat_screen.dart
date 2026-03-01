@@ -1,4 +1,6 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 import '../../../utils/colors.dart';
 import '../../../utils/text_styles.dart';
@@ -119,35 +121,42 @@ class _AiChatScreenState extends State<AiChatScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
+      backgroundColor: AppColors.pureWhite,
       appBar: AppBar(
-        title: const Text('AI Қауіпсіздік кеңесшісі'),
-        backgroundColor: Colors.white,
+        title: Text('Кеңесші', style: AppTextStyles.label.copyWith(fontSize: 17, fontWeight: FontWeight.w600)),
+        backgroundColor: AppColors.pureWhite.withValues(alpha: 0.85),
+        surfaceTintColor: Colors.transparent,
+        flexibleSpace: ClipRRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+            child: Container(color: Colors.transparent),
+          ),
+        ),
+        centerTitle: true,
+        elevation: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(0.5),
+          child: Container(
+            color: AppColors.border,
+            height: 0.5,
+          ),
+        ),
       ),
       body: Column(
         children: [
-          Container(
-            width: double.infinity,
-            margin: const EdgeInsets.all(16),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.amber.shade50,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.amber.shade300),
-            ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 16),
             child: Text(
-              'Дисклеймер: жауаптар құқықтық/медициналық қорытынды емес. Қауіп болса 112-ге хабарласыңыз.',
-              style: AppTextStyles.caption,
+              'Бұл жауаптар құқықтық немесе медициналық қорытынды емес. Қауіп төнген жағдайда 112 нөміріне хабарласыңыз.',
+              style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary, height: 1.4),
+              textAlign: TextAlign.center,
             ),
           ),
-          _QuickPrompts(
-              onTap: (value, context) => _send(value, context: context)),
           Expanded(
             child: _historyLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: CupertinoActivityIndicator())
                 : ListView.builder(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.only(left: 16, right: 16, bottom: 140, top: 8), // Padding for frosted bottom
                     itemCount: _messages.length,
                     itemBuilder: (context, index) {
                       final item = _messages[index];
@@ -158,24 +167,23 @@ class _AiChatScreenState extends State<AiChatScreen> {
                             ? Alignment.centerRight
                             : Alignment.centerLeft,
                         child: Container(
-                          margin: const EdgeInsets.symmetric(vertical: 6),
-                          padding: const EdgeInsets.all(12),
+                          margin: const EdgeInsets.symmetric(vertical: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           constraints: BoxConstraints(
                               maxWidth:
-                                  MediaQuery.of(context).size.width * 0.8),
+                                  MediaQuery.of(context).size.width * 0.75),
                           decoration: BoxDecoration(
-                            color: isUser ? AppColors.primary : Colors.white,
-                            borderRadius: BorderRadius.circular(12),
-                            border: isUser
-                                ? null
-                                : Border.all(color: AppColors.border),
+                            color: isUser ? CupertinoColors.systemBlue : AppColors.inputBg,
+                            borderRadius: BorderRadius.circular(20).copyWith(
+                              bottomRight: isUser ? const Radius.circular(4) : const Radius.circular(20),
+                              bottomLeft: !isUser ? const Radius.circular(4) : const Radius.circular(20),
+                            ),
                           ),
                           child: Text(
                             item.text,
-                            style: TextStyle(
-                              color:
-                                  isUser ? Colors.white : AppColors.textPrimary,
-                              fontSize: 14,
+                            style: AppTextStyles.body.copyWith(
+                              color: isUser ? AppColors.pureWhite : AppColors.textPrimary,
+                              height: 1.3,
                             ),
                           ),
                         ),
@@ -183,47 +191,78 @@ class _AiChatScreenState extends State<AiChatScreen> {
                     },
                   ),
           ),
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: Row(
+        ],
+      ),
+      bottomSheet: ClipRRect(
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+          child: Container(
+            decoration: BoxDecoration(
+              color: AppColors.pureWhite.withValues(alpha: 0.85),
+              border: const Border(top: BorderSide(color: AppColors.border, width: 0.5)),
+            ),
+            child: SafeArea(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Expanded(
-                    child: TextField(
-                      controller: _controller,
-                      enabled: !_sending,
-                      decoration: InputDecoration(
-                        hintText: 'Сұрағыңызды жазыңыз...',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
+                  const SizedBox(height: 8),
+                  _QuickPrompts(
+                      onTap: (value, context) => _send(value, context: context)),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              color: AppColors.pureWhite,
+                              borderRadius: BorderRadius.circular(24),
+                              border: Border.all(color: AppColors.border, width: 0.5),
+                            ),
+                            child: TextField(
+                              controller: _controller,
+                              enabled: !_sending,
+                              style: AppTextStyles.body,
+                              maxLines: 4,
+                              minLines: 1,
+                              decoration: InputDecoration(
+                                hintText: 'Сұрағыңызды жазыңыз...',
+                                hintStyle: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
+                                border: InputBorder.none,
+                                contentPadding: const EdgeInsets.symmetric(
+                                    horizontal: 16, vertical: 10),
+                              ),
+                            ),
+                          ),
                         ),
-                        contentPadding: const EdgeInsets.symmetric(
-                            horizontal: 12, vertical: 10),
-                      ),
+                        const SizedBox(width: 8),
+                        GestureDetector(
+                          onTap: _sending ? null : () => _send(_controller.text),
+                          child: Container(
+                            margin: const EdgeInsets.only(bottom: 4),
+                            width: 36,
+                            height: 36,
+                            decoration: BoxDecoration(
+                              color: _sending ? AppColors.border : CupertinoColors.systemBlue,
+                              shape: BoxShape.circle,
+                            ),
+                            child: _sending
+                                ? const Padding(
+                                    padding: EdgeInsets.all(10.0),
+                                    child: CupertinoActivityIndicator(color: Colors.white, radius: 8),
+                                  )
+                                : const Icon(CupertinoIcons.arrow_up, color: Colors.white, size: 20),
+                          ),
+                        ),
+                      ],
                     ),
-                  ),
-                  const SizedBox(width: 8),
-                  ElevatedButton(
-                    onPressed: _sending ? null : () => _send(_controller.text),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppColors.primary,
-                      foregroundColor: Colors.white,
-                    ),
-                    child: _sending
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                                strokeWidth: 2, color: Colors.white),
-                          )
-                        : const Text('Жіберу'),
                   ),
                 ],
               ),
             ),
           ),
-        ],
+        ),
       ),
       bottomNavigationBar: BottomNavBar(
         currentIndex: _currentIndex,
@@ -269,9 +308,16 @@ class _QuickPrompts extends StatelessWidget {
         scrollDirection: Axis.horizontal,
         itemBuilder: (context, index) {
           final item = prompts[index];
-          return ActionChip(
-            label: Text(item.title),
-            onPressed: () => onTap(item.text, item.context),
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: ActionChip(
+              label: Text(item.title, style: AppTextStyles.label.copyWith(fontSize: 13, color: AppColors.textPrimary)),
+              backgroundColor: AppColors.inputBg,
+              side: BorderSide.none,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              onPressed: () => onTap(item.text, item.context),
+            ),
           );
         },
         separatorBuilder: (_, __) => const SizedBox(width: 8),

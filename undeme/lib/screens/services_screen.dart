@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../features/services/data/services_repository.dart';
@@ -75,27 +76,13 @@ class _ServicesScreenState extends State<ServicesScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.background,
         elevation: 0,
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child:
-                  const Icon(Icons.shield, color: AppColors.primary, size: 24),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'Undeme',
-              style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold),
-            ),
+            const Icon(CupertinoIcons.shield_fill, color: AppColors.systemRed, size: 28),
+            const SizedBox(width: 8),
+            Text('Undeme', style: AppTextStyles.title.copyWith(fontSize: 22)),
           ],
         ),
         actions: [
@@ -144,66 +131,48 @@ class _ServicesScreenState extends State<ServicesScreen> {
 
     return SingleChildScrollView(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text('Қызметтер', style: AppTextStyles.largeTitle),
+          ),
           const SizedBox(height: 24),
-          Text('Төтенше қызметтер', style: AppTextStyles.title),
-          const SizedBox(height: 8),
-          Text('Төтенше жағдайда төмендегі нөмірлерге қоңырау шалыңыз',
-              style: AppTextStyles.subtitle),
-          const SizedBox(height: 48),
+          
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
+            child: Text('ТӨТЕНШЕ НӨМІРЛЕР', style: AppTextStyles.caption.copyWith(fontSize: 13, color: AppColors.textSecondary)),
+          ),
           Container(
-            margin: const EdgeInsets.symmetric(horizontal: 24),
-            padding: const EdgeInsets.all(32),
+            margin: const EdgeInsets.symmetric(horizontal: 16),
             decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(color: AppColors.border),
+              color: AppColors.pureWhite,
+              borderRadius: BorderRadius.circular(10),
             ),
-            child: Column(
-              children: [
-                const Text('🚨', style: TextStyle(fontSize: 100)),
-                const SizedBox(height: 24),
-                Text('Төтенше көмек қажет пе?',
-                    style: AppTextStyles.title.copyWith(fontSize: 22)),
-                const SizedBox(height: 12),
-                Text(
-                  'Төмендегі қызметтерге қоңырау шалыңыз',
-                  style: AppTextStyles.subtitle,
-                  textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 32),
-                ..._services.map((service) => Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: _buildEmergencyButton(service),
-                    )),
-              ],
+            child: ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: EdgeInsets.zero,
+              itemCount: _services.length,
+              separatorBuilder: (context, index) => const Divider(
+                height: 1,
+                thickness: 0.5,
+                indent: 60,
+                color: AppColors.border,
+              ),
+              itemBuilder: (context, index) {
+                return _buildEmergencyButton(_services[index], index);
+              },
             ),
           ),
-          const SizedBox(height: 32),
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 24),
-            padding: const EdgeInsets.all(20),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(12),
-              border:
-                  Border.all(color: AppColors.primary.withValues(alpha: 0.3)),
-            ),
-            child: Row(
-              children: [
-                const Icon(Icons.info_outline,
-                    color: AppColors.primary, size: 24),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Text(
-                    _note.isEmpty
-                        ? 'Төтенше жағдай кезінде 112 нөміріне қоңырау шалыңыз.'
-                        : _note,
-                    style:
-                        AppTextStyles.body.copyWith(color: AppColors.primary),
-                  ),
-                ),
-              ],
+          Padding(
+            padding: const EdgeInsets.fromLTRB(32, 8, 32, 24),
+            child: Text(
+              _note.isEmpty
+                  ? 'Төтенше жағдай кезінде 112 нөміріне қоңырау шалыңыз.'
+                  : _note,
+              style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary),
             ),
           ),
           const SizedBox(height: 24),
@@ -212,45 +181,37 @@ class _ServicesScreenState extends State<ServicesScreen> {
     );
   }
 
-  Widget _buildEmergencyButton(EmergencyService service) {
+  Widget _buildEmergencyButton(EmergencyService service, int index) {
     return InkWell(
       onTap: () => _makePhoneCall(service.number),
       child: Container(
         width: double.infinity,
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          color: AppColors.primary,
-          borderRadius: BorderRadius.circular(12),
-        ),
+        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
         child: Row(
           children: [
-            Text(service.emoji, style: const TextStyle(fontSize: 48)),
-            const SizedBox(width: 20),
+            Container(
+              width: 30,
+              height: 30,
+              alignment: Alignment.center,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: Text(service.emoji, style: const TextStyle(fontSize: 16)),
+            ),
+            const SizedBox(width: 16),
             Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    service.label,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    service.number,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ],
+              child: Text(
+                service.label,
+                style: AppTextStyles.body,
               ),
             ),
-            const Icon(Icons.phone, color: Colors.white, size: 32),
+            Text(
+              service.number,
+              style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
+            ),
+            const SizedBox(width: 8),
+            const Icon(CupertinoIcons.phone, color: AppColors.primary, size: 20),
           ],
         ),
       ),

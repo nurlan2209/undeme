@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 import '../features/auth/data/auth_repository.dart';
 import '../features/profile/data/profile_repository.dart';
@@ -7,8 +8,6 @@ import '../features/profile/domain/user_profile.dart';
 import '../utils/colors.dart';
 import '../utils/text_styles.dart';
 import '../widgets/bottom_nav_bar.dart';
-import '../widgets/custom_text_field.dart';
-import '../widgets/emergency_contact_card.dart';
 import 'auth_screen.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -77,7 +76,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: AppColors.primary),
+      SnackBar(
+        content: Text(
+          '// ERROR: $message',
+          style: AppTextStyles.logText.copyWith(color: Colors.white),
+        ),
+        backgroundColor: AppColors.primary,
+        behavior: SnackBarBehavior.floating, // Floating but flat
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(4)), // Utility-Core low radius
+        elevation: 0,
+        margin: const EdgeInsets.all(16),
+      ),
     );
   }
 
@@ -367,12 +376,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.background,
         elevation: 0,
-        title: const Text('Профиль және баптаулар'),
+        title: Text('Баптаулар', style: AppTextStyles.title.copyWith(fontSize: 22)),
+        centerTitle: true,
         actions: [
           IconButton(
-            icon: const Icon(Icons.logout, color: AppColors.primary),
+            icon: const Icon(Icons.logout, color: AppColors.textPrimary),
             onPressed: _logout,
           ),
         ],
@@ -380,155 +390,162 @@ class _ProfileScreenState extends State<ProfileScreen> {
       body: RefreshIndicator(
         onRefresh: _loadProfile,
         child: ListView(
-          padding: const EdgeInsets.only(bottom: 24),
+          padding: const EdgeInsets.symmetric(vertical: 16),
           children: [
-            _buildSection(
-              icon: Icons.person,
-              title: 'Жеке ақпарат',
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
+              child: Text('ЖЕКЕ АҚПАРАТ', style: AppTextStyles.caption.copyWith(fontSize: 13, color: AppColors.textSecondary)),
+            ),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: AppColors.pureWhite,
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: Column(
                 children: [
-                  CustomTextField(
-                    label: 'Толық аты-жөні',
-                    hintText: 'John Smith',
-                    controller: fullNameController,
-                  ),
-                  const SizedBox(height: 16),
-                  CustomTextField(
-                    label: 'Email',
-                    hintText: 'john.smith@email.com',
-                    controller: emailController,
-                    readOnly: true,
-                  ),
-                  const SizedBox(height: 16),
-                  CustomTextField(
-                    label: 'Телефон нөмірі',
-                    hintText: '+1 (555) 123-4567',
-                    controller: phoneController,
-                    keyboardType: TextInputType.phone,
-                  ),
-                  const SizedBox(height: 16),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton(
-                      onPressed: isSavingProfile ? null : _saveProfile,
-                      style: ElevatedButton.styleFrom(
-                          backgroundColor: AppColors.primary),
-                      child: isSavingProfile
-                          ? const SizedBox(
-                              height: 18,
-                              width: 18,
-                              child: CircularProgressIndicator(
-                                  strokeWidth: 2, color: Colors.white),
-                            )
-                          : const Text('Профильді сақтау'),
-                    ),
-                  ),
+                   _buildSettingsTextField('Толық аты-жөні', 'John Smith', fullNameController),
+                   const Divider(height: 1, indent: 16, color: AppColors.border),
+                   _buildSettingsTextField('Email', 'john.smith@email.com', emailController, readOnly: true),
+                   const Divider(height: 1, indent: 16, color: AppColors.border),
+                   _buildSettingsTextField('Телефон нөмірі', '+1 (555) 123-4567', phoneController, isPhone: true),
+                   const Divider(height: 1, indent: 16, color: AppColors.border),
+                   GestureDetector(
+                     onTap: isSavingProfile ? null : _saveProfile,
+                     child: Container(
+                       width: double.infinity,
+                       padding: const EdgeInsets.symmetric(vertical: 14),
+                       alignment: Alignment.center,
+                       child: isSavingProfile
+                           ? const CupertinoActivityIndicator()
+                           : Text('Профильді сақтау', style: AppTextStyles.body.copyWith(color: AppColors.systemBlue, fontWeight: FontWeight.w600)),
+                     ),
+                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-            _buildSection(
-              icon: Icons.shield,
-              title: 'Төтенше контактілер',
+            
+            const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
+              child: Text('ТӨТЕНШЕ КОНТАКТІЛЕР', style: AppTextStyles.caption.copyWith(fontSize: 13, color: AppColors.textSecondary)),
+            ),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: AppColors.pureWhite,
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    'SOS кезінде хабарланатын контактілер',
-                    style: AppTextStyles.caption,
-                  ),
-                  const SizedBox(height: 12),
                   if (emergencyContacts.isEmpty)
-                    Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: AppColors.border),
-                        borderRadius: BorderRadius.circular(12),
-                        color: Colors.white,
-                      ),
-                      child: Text(
-                          'Контакттар жоқ. Ең кемі 1 сенімді контакт қосыңыз.',
-                          style: AppTextStyles.caption),
+                    Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Text('Ең кемі 1 сенімді контакт қосыңыз.', style: AppTextStyles.body.copyWith(color: AppColors.textSecondary)),
                     )
                   else
-                    ...emergencyContacts.map(
-                      (contact) => Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: EmergencyContactCard(
-                          name: contact.name,
-                          phone: contact.phone,
-                          relation: contact.relation,
-                          onEdit: () => _addOrEditContact(source: contact),
-                          onRemove: () => _removeContact(contact),
+                    ...emergencyContacts.asMap().entries.map((entry) {
+                      final index = entry.key;
+                      final contact = entry.value;
+                      return Column(
+                        children: [
+                          _buildContactTile(contact),
+                          if (index < emergencyContacts.length - 1)
+                            const Divider(height: 1, indent: 16, color: AppColors.border),
+                        ],
+                      );
+                    }),
+                  if (emergencyContacts.isNotEmpty && emergencyContacts.length < 5)
+                    const Divider(height: 1, indent: 16, color: AppColors.border),
+                  if (emergencyContacts.length < 5)
+                    GestureDetector(
+                      onTap: () => _addOrEditContact(),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
+                        child: Row(
+                          children: [
+                            const Icon(CupertinoIcons.add_circled_solid, color: AppColors.systemGreen, size: 22),
+                            const SizedBox(width: 12),
+                            Text('Контакт қосу', style: AppTextStyles.body.copyWith(color: AppColors.systemBlue)),
+                          ],
                         ),
                       ),
                     ),
-                  const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: emergencyContacts.length >= 5
-                        ? null
-                        : () => _addOrEditContact(),
-                    icon: const Icon(Icons.add),
-                    label: const Text('Контакт қосу'),
-                  ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-            _buildSection(
-              icon: Icons.settings,
-              title: 'SOS баптаулары',
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
+              child: Text('SOS кезінде хабарланатын контактілер', style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
+            ),
+
+            const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
+              child: Text('SOS БАПТАУЛАРЫ', style: AppTextStyles.caption.copyWith(fontSize: 13, color: AppColors.textSecondary)),
+            ),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: AppColors.pureWhite,
+                borderRadius: BorderRadius.circular(10),
+              ),
               child: Column(
                 children: [
-                  _buildSwitchTile(
+                  _buildCupertinoSwitchTile(
                     'SOS батырмасының дірілі',
-                    'Іске қосылғанда қысқа вибрация',
                     settings['sosVibration'] == true,
                     (value) => _updateSetting('sosVibration', value),
                   ),
-                  _buildSwitchTile(
+                  const Divider(height: 1, indent: 16, color: AppColors.border),
+                  _buildCupertinoSwitchTile(
                     'Орынды автоматты бөлісу',
-                    'SOS кезінде геолокация жіберу',
                     settings['autoLocation'] != false,
                     (value) => _updateSetting('autoLocation', value),
                   ),
-                  _buildSwitchTile(
+                  const Divider(height: 1, indent: 16, color: AppColors.border),
+                  _buildCupertinoSwitchTile(
                     'Төтенше хабарландырулар',
-                    'Маңызды қауіп ескертпелерін алу',
                     settings['emergencyNotif'] != false,
                     (value) => _updateSetting('emergencyNotif', value),
                   ),
-                  _buildSwitchTile(
+                  const Divider(height: 1, indent: 16, color: AppColors.border),
+                  _buildCupertinoSwitchTile(
                     'Дыбыстық сигнал',
-                    'SOS іске қосылғанда дыбыс',
                     settings['soundAlerts'] == true,
                     (value) => _updateSetting('soundAlerts', value),
                   ),
                 ],
               ),
             ),
-            const SizedBox(height: 20),
-            _buildSection(
-              icon: Icons.warning_amber_rounded,
-              title: 'Қауіпсіздік',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                      'Аккаунтты жойғаннан кейін деректерді қалпына келтіру мүмкін емес.',
-                      style: AppTextStyles.caption),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    onPressed: _deleteAccount,
-                    style:
-                        ElevatedButton.styleFrom(backgroundColor: Colors.red),
-                    icon: const Icon(Icons.delete_forever),
-                    label: const Text('Аккаунтты жою'),
-                  ),
-                ],
+
+            const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
+              child: Text('ҚАУІПСІЗДІК', style: AppTextStyles.caption.copyWith(fontSize: 13, color: AppColors.textSecondary)),
+            ),
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              decoration: BoxDecoration(
+                color: AppColors.pureWhite,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: GestureDetector(
+                onTap: _deleteAccount,
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  alignment: Alignment.center,
+                  child: Text('Аккаунтты жою', style: AppTextStyles.body.copyWith(color: AppColors.systemRed)),
+                ),
               ),
             ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 8),
+              child: Text('Аккаунтты жойғаннан кейін деректерді қалпына келтіру мүмкін емес.', style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
+            ),
+            const SizedBox(height: 24),
           ],
         ),
       ),
@@ -543,58 +560,74 @@ class _ProfileScreenState extends State<ProfileScreen> {
     );
   }
 
-  Widget _buildSection(
-      {required IconData icon, required String title, required Widget child}) {
+  Widget _buildSettingsTextField(String label, String hint, TextEditingController controller, {bool readOnly = false, bool isPhone = false}) {
     return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 24),
-      padding: const EdgeInsets.all(20),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: AppColors.border),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+      child: Row(
         children: [
-          Row(
-            children: [
-              Icon(icon, size: 20),
-              const SizedBox(width: 8),
-              Text(title,
-                  style:
-                      AppTextStyles.body.copyWith(fontWeight: FontWeight.w600)),
-            ],
+          SizedBox(
+            width: 120,
+            child: Text(label, style: AppTextStyles.body),
           ),
-          const SizedBox(height: 16),
-          child,
+          Expanded(
+            child: TextField(
+              controller: controller,
+              readOnly: readOnly,
+              keyboardType: isPhone ? TextInputType.phone : TextInputType.text,
+              style: AppTextStyles.body.copyWith(color: readOnly ? AppColors.textSecondary : AppColors.systemBlue),
+              decoration: InputDecoration(
+                hintText: hint,
+                hintStyle: AppTextStyles.body.copyWith(color: AppColors.textSecondary.withValues(alpha: 0.5)),
+                border: InputBorder.none,
+                isDense: true,
+              ),
+            ),
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildSwitchTile(
-      String title, String subtitle, bool value, ValueChanged<bool> onChanged) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
+  Widget _buildCupertinoSwitchTile(String title, bool value, ValueChanged<bool> onChanged) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         children: [
+          Expanded(child: Text(title, style: AppTextStyles.body)),
+          CupertinoSwitch(
+            value: value,
+            activeColor: AppColors.systemGreen,
+            onChanged: onChanged,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildContactTile(EmergencyContact contact) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => _removeContact(contact),
+            child: const Icon(CupertinoIcons.minus_circle_fill, color: AppColors.systemRed, size: 22),
+          ),
+          const SizedBox(width: 12),
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(title,
-                    style: AppTextStyles.body
-                        .copyWith(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Text(subtitle, style: AppTextStyles.caption),
+                Text(contact.name, style: AppTextStyles.body),
+                const SizedBox(height: 2),
+                Text('${contact.relation} • ${contact.phone}', style: AppTextStyles.caption.copyWith(color: AppColors.textSecondary)),
               ],
             ),
           ),
-          Switch(
-            value: value,
-            onChanged: onChanged,
-            activeThumbColor: AppColors.primary,
+          GestureDetector(
+            onTap: () => _addOrEditContact(source: contact),
+            child: const Icon(CupertinoIcons.pencil, color: AppColors.systemBlue, size: 20),
           ),
         ],
       ),

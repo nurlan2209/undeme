@@ -1,3 +1,4 @@
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import '../utils/colors.dart';
 
@@ -13,28 +14,28 @@ class BottomNavBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white,
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
-            blurRadius: 10,
+    return ClipRRect(
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 20, sigmaY: 20),
+        child: Container(
+          decoration: BoxDecoration(
+            color: AppColors.cardBg.withValues(alpha: 0.85),
+            border: const Border(top: BorderSide(color: AppColors.border, width: 0.5)),
           ),
-        ],
-      ),
-      child: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
-            children: [
-              _buildNavItem(Icons.error_outline, 'SOS', 0),
-              _buildNavItem(Icons.map_outlined, 'Қызметтер', 1),
-              _buildNavItem(Icons.chat_bubble_outline, 'AI чат', 2),
-              _buildNavItem(Icons.menu_book_outlined, 'Заң', 3),
-              _buildNavItem(Icons.person_outline, 'Профиль', 4),
-            ],
+          child: SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _buildNavItem(Icons.error_outline, 'SOS', 0),
+                  _buildNavItem(Icons.map_outlined, 'Қызметтер', 1),
+                  _buildNavItem(Icons.chat_bubble_outline, 'AI чат', 2),
+                  _buildNavItem(Icons.menu_book_outlined, 'Заң', 3),
+                  _buildNavItem(Icons.person_outline, 'Профиль', 4),
+                ],
+              ),
+            ),
           ),
         ),
       ),
@@ -43,25 +44,33 @@ class BottomNavBar extends StatelessWidget {
 
   Widget _buildNavItem(IconData icon, String label, int index) {
     final isSelected = currentIndex == index;
-    return InkWell(
+    return GestureDetector(
       onTap: () => onTap(index),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            color: isSelected ? AppColors.primary : AppColors.textSecondary,
-            size: 24,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 12,
+      behavior: HitTestBehavior.opaque,
+      child: SizedBox(
+        width: 64,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
               color: isSelected ? AppColors.primary : AppColors.textSecondary,
+              size: 28,
             ),
-          ),
-        ],
+            const SizedBox(height: 2),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w500,
+                color: isSelected ? AppColors.primary : AppColors.textSecondary,
+                letterSpacing: 0,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
+        ),
       ),
     );
   }

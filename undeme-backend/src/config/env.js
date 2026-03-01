@@ -14,6 +14,11 @@ const schema = Joi.object({
   SOS_COOLDOWN_SECONDS: Joi.number().integer().min(5).default(30),
   GEMINI_API_KEY: Joi.string().allow(""),
   GEMINI_MODEL: Joi.string().trim().default("gemini-3.5-flash-preview"),
+  WHATSAPP_BUSINESS_TOKEN: Joi.string().allow(""),
+  WHATSAPP_PHONE_NUMBER_ID: Joi.string().allow(""),
+  WHATSAPP_API_VERSION: Joi.string().trim().default("v22.0"),
+  WHATSAPP_TEMPLATE_NAME: Joi.string().trim().allow(""),
+  WHATSAPP_TEMPLATE_LANGUAGE: Joi.string().trim().default("en_US"),
 });
 
 const { value, error } = schema.validate(process.env, {
@@ -41,6 +46,11 @@ const env = {
   sosCooldownSeconds: value.SOS_COOLDOWN_SECONDS,
   geminiApiKey: value.GEMINI_API_KEY || "",
   geminiModel: value.GEMINI_MODEL,
+  whatsappBusinessToken: value.WHATSAPP_BUSINESS_TOKEN || "",
+  whatsappPhoneNumberId: value.WHATSAPP_PHONE_NUMBER_ID || "",
+  whatsappApiVersion: value.WHATSAPP_API_VERSION,
+  whatsappTemplateName: value.WHATSAPP_TEMPLATE_NAME || "",
+  whatsappTemplateLanguage: value.WHATSAPP_TEMPLATE_LANGUAGE,
 };
 
 module.exports = env;

@@ -14,9 +14,46 @@ const buildMessage = ({ user, location, reason }) => {
     .join("\n");
 };
 
+const normalizePhone = (phone) => {
+  if (!phone) {
+    return "";
+  }
+  return String(phone).replace(/[^\d]/g, "");
+};
+
+const buildWhatsAppBody = ({ to, message }) => {
+  if (env.whatsappTemplateName) {
+    return {
+      messaging_product: "whatsapp",
+      to,
+      type: "template",
+      template: {
+        name: env.whatsappTemplateName,
+        language: {
+          code: env.whatsappTemplateLanguage,
+        },
+      },
+    };
+  }
+
+  return {
+    messaging_product: "whatsapp",
+    to,
+    type: "text",
+    text: {
+      preview_url: false,
+      body: message.slice(0, 4096),
+    },
+  };
+};
+
 const dispatchWebhook = async ({ payload }) => {
   if (!env.sosWebhookUrl) {
-    return { channel: "webhook", success: false, error: "SOS_WEBHOOK_URL is not configured" };
+    return {
+      channel: "webhook",
+      success: false,
+      error: "SOS_WEBHOOK_URL is not configured",
+    };
   }
 
   try {
@@ -40,23 +77,67 @@ const dispatchWebhook = async ({ payload }) => {
   }
 };
 
-const dispatchSmsPlaceholder = async ({ contacts }) => {
+const dispatchWhatsAppBusiness = async ({ contacts, message }) => {
   if (!contacts.length) {
     return {
-      channel: "sms",
+      channel: "whatsapp_business",
       success: false,
       error: "No emergency contacts configured",
     };
   }
 
+  if (!env.whatsappBusinessToken || !env.whatsappPhoneNumberId) {
+    return {
+      channel: "whatsapp_business",
+      success: false,
+      error: "WhatsApp Business credentials are not configured",
+    };
+  }
+
+  const endpoint = `https://graph.facebook.com/${env.whatsappApiVersion}/${env.whatsappPhoneNumberId}/messages`;
+
+  let sent = 0;
+  const errors = [];
+
+  for (const contact of contacts) {
+    const to = normalizePhone(contact.phone);
+    if (!to) {
+      errors.push(`${contact.name || "contact"}: invalid phone`);
+      continue;
+    }
+
+    try {
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${env.whatsappBusinessToken}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(buildWhatsAppBody({ to, message })),
+      });
+
+      const data = await response.json().catch(() => ({}));
+      if (!response.ok) {
+        errors.push(`${contact.name || to}: ${data?.error?.message || response.status}`);
+        continue;
+      }
+
+      sent += 1;
+    } catch (error) {
+      errors.push(`${contact.name || to}: ${error.message}`);
+    }
+  }
+
   return {
-    channel: "sms",
-    success: true,
-    error: null,
+    channel: "whatsapp_business",
+    success: sent > 0,
+    error: sent > 0 ? (errors.length ? errors.join("; ") : null) : errors.join("; "),
   };
 };
 
 const sendEmergencyNotifications = async ({ user, reason, location }) => {
+  const message = buildMessage({ user, location, reason });
+
   const payload = {
     type: "sos_alert",
     userId: String(user._id),
@@ -65,15 +146,15 @@ const sendEmergencyNotifications = async ({ user, reason, location }) => {
     contacts: user.emergencyContacts,
     reason: reason || "",
     location,
-    message: buildMessage({ user, location, reason }),
+    message,
   };
 
-  const [webhookResult, smsResult] = await Promise.all([
+  const [webhookResult, whatsappResult] = await Promise.all([
     dispatchWebhook({ payload }),
-    dispatchSmsPlaceholder({ contacts: user.emergencyContacts || [] }),
+    dispatchWhatsAppBusiness({ contacts: user.emergencyContacts || [], message }),
   ]);
 
-  const attempts = [webhookResult, smsResult];
+  const attempts = [webhookResult, whatsappResult];
   const successCount = attempts.filter((item) => item.success).length;
 
   let status = "failed";

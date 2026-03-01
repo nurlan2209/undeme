@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 
 import '../features/legal/data/legal_repository.dart';
 import '../features/legal/domain/legal_topic.dart';
@@ -101,27 +102,13 @@ class _LegalScreenState extends State<LegalScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: Colors.white,
+        backgroundColor: AppColors.background,
         elevation: 0,
         title: Row(
           children: [
-            Container(
-              padding: const EdgeInsets.all(8),
-              decoration: BoxDecoration(
-                color: AppColors.primary.withValues(alpha: 0.1),
-                borderRadius: BorderRadius.circular(8),
-              ),
-              child:
-                  const Icon(Icons.shield, color: AppColors.primary, size: 24),
-            ),
-            const SizedBox(width: 12),
-            const Text(
-              'Undeme',
-              style: TextStyle(
-                  color: Colors.black,
-                  fontSize: 20,
-                  fontWeight: FontWeight.bold),
-            ),
+            const Icon(CupertinoIcons.shield_fill, color: AppColors.systemRed, size: 28),
+            const SizedBox(width: 8),
+            Text('Undeme', style: AppTextStyles.title.copyWith(fontSize: 22)),
           ],
         ),
         actions: [
@@ -170,31 +157,37 @@ class _LegalScreenState extends State<LegalScreen> {
 
     return SingleChildScrollView(
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          const SizedBox(height: 24),
-          Text('Заң кітапханасы', style: AppTextStyles.title),
+          const SizedBox(height: 16),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text('Заң кітапханасы', style: AppTextStyles.largeTitle),
+          ),
           const SizedBox(height: 8),
-          Text('Заң ақпаратын іздеңіз және құқықтарыңызды біліңіз',
-              style: AppTextStyles.subtitle),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Text('Азаматтық құқықтарыңыз бен міндеттеріңіз жайлы оқыңыз',
+                style: AppTextStyles.subtitle),
+          ),
           const SizedBox(height: 24),
           Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Container(
+              height: 44,
               decoration: BoxDecoration(
                 color: AppColors.inputBg,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10), // Native iOS Search Field
               ),
               child: TextField(
                 controller: _searchController,
                 style: AppTextStyles.body,
                 decoration: InputDecoration(
-                  hintText:
-                      'Заң тақырыптарын, құқықтарды немесе рәсімдерді іздеу...',
-                  hintStyle: AppTextStyles.caption,
-                  prefixIcon:
-                      const Icon(Icons.search, color: AppColors.textSecondary),
+                  hintText: 'Тақырыпты немесе заңды іздеу',
+                  hintStyle: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
+                  prefixIcon: const Icon(CupertinoIcons.search, color: AppColors.systemGray, size: 20),
                   border: InputBorder.none,
-                  contentPadding: const EdgeInsets.all(16),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
             ),
@@ -202,12 +195,12 @@ class _LegalScreenState extends State<LegalScreen> {
           const SizedBox(height: 24),
           SingleChildScrollView(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 20),
             child: Row(
               children: _categories.map((category) {
                 final isSelected = _selectedCategory == category;
                 return Padding(
-                  padding: const EdgeInsets.only(right: 12),
+                  padding: const EdgeInsets.only(right: 8),
                   child: InkWell(
                     onTap: () {
                       setState(() {
@@ -215,22 +208,20 @@ class _LegalScreenState extends State<LegalScreen> {
                       });
                       _loadTopics(showLoader: false);
                     },
+                    borderRadius: BorderRadius.circular(20),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 20, vertical: 12),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                       decoration: BoxDecoration(
-                        color:
-                            isSelected ? AppColors.textPrimary : Colors.white,
-                        borderRadius: BorderRadius.circular(24),
-                        border: Border.all(color: AppColors.border),
+                        color: isSelected ? AppColors.textPrimary : AppColors.pureWhite,
+                        borderRadius: BorderRadius.circular(20),
+                        border: isSelected ? null : Border.all(color: AppColors.border, width: 0.5),
                       ),
                       child: Text(
                         category,
                         style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w600,
-                          color:
-                              isSelected ? Colors.white : AppColors.textPrimary,
+                          fontSize: 15,
+                          fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
+                          color: isSelected ? AppColors.pureWhite : AppColors.textPrimary,
                         ),
                       ),
                     ),
@@ -251,29 +242,31 @@ class _LegalScreenState extends State<LegalScreen> {
           const SizedBox(height: 16),
           if (_topics.isEmpty)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Container(
                 width: double.infinity,
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: AppColors.pureWhite,
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: AppColors.border),
                 ),
-                child: Text('Сұраныс бойынша материал табылмады',
-                    style: AppTextStyles.caption),
+                child: Center(
+                  child: Text('Сұраныс бойынша материал табылмады',
+                      style: AppTextStyles.caption),
+                ),
               ),
             )
           else
             ListView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),
-              padding: const EdgeInsets.symmetric(horizontal: 24),
+              padding: const EdgeInsets.symmetric(horizontal: 20),
               itemCount: _topics.length,
               itemBuilder: (context, index) {
                 final topic = _topics[index];
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.only(bottom: 16),
                   child: _buildLegalCard(topic),
                 );
               },
@@ -286,41 +279,45 @@ class _LegalScreenState extends State<LegalScreen> {
 
   Widget _buildLegalCard(LegalTopic topic) {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: AppColors.border),
+        color: AppColors.cardBg, // White
+        borderRadius: BorderRadius.circular(24), // Squircle
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04), // highly diffused, faint
+            blurRadius: 24,
+            offset: const Offset(0, 10),
+          ),
+        ],
       ),
-      child: Row(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(_iconForCategory(topic.category),
-                color: AppColors.primary, size: 24),
+          Row(
+            children: [
+              Icon(_iconForCategory(topic.category), color: AppColors.systemBlue, size: 20),
+              const SizedBox(width: 8),
+              Text(
+                topic.category.toUpperCase(),
+                style: AppTextStyles.caption.copyWith(
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.systemBlue,
+                  letterSpacing: 0.5,
+                ),
+              ),
+            ],
           ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(topic.title,
-                    style: AppTextStyles.body
-                        .copyWith(fontWeight: FontWeight.w600)),
-                const SizedBox(height: 4),
-                Text(topic.category,
-                    style: AppTextStyles.caption.copyWith(fontSize: 12)),
-                const SizedBox(height: 2),
-                Text(topic.description,
-                    style: AppTextStyles.caption.copyWith(fontSize: 12)),
-              ],
-            ),
+          const SizedBox(height: 12),
+          Text(
+            topic.title,
+            style: AppTextStyles.title.copyWith(fontSize: 22, height: 1.2),
           ),
-          const Icon(Icons.chevron_right, color: AppColors.textSecondary),
+          const SizedBox(height: 8),
+          Text(
+            topic.description,
+            style: AppTextStyles.body.copyWith(color: AppColors.textSecondary),
+          ),
         ],
       ),
     );
@@ -329,15 +326,15 @@ class _LegalScreenState extends State<LegalScreen> {
   IconData _iconForCategory(String category) {
     switch (category) {
       case 'Полиция':
-        return Icons.policy_outlined;
+        return CupertinoIcons.shield_fill;
       case 'Медициналық':
-        return Icons.local_hospital_outlined;
+        return CupertinoIcons.bandage_fill;
       case 'Конституциялық құқықтар':
-        return Icons.gavel_outlined;
+        return CupertinoIcons.book_fill;
       case 'Жеке қауіпсіздік':
-        return Icons.security_outlined;
+        return CupertinoIcons.lock_fill;
       default:
-        return Icons.menu_book_outlined;
+        return CupertinoIcons.news_solid;
     }
   }
 }
